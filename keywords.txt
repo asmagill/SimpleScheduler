@@ -1,0 +1,40 @@
+#######################################
+# Syntax Coloring Map For SimpleScheduler
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+SimpleScheduler	KEYWORD1
+~SimpleScheduler	KEYWORD1
+t_scheduledTask	KEYWORD1
+SimpleTask	KEYWORD1
+#######################################
+# Methods and Functions (KEYWORD2) Public
+#######################################
+checkQueue	KEYWORD2
+doTaskAfter	KEYWORD2
+doTaskEvery	KEYWORD2
+pauseTask	KEYWORD2
+resumeTask	KEYWORD2
+removeTask	KEYWORD2
+removeTaskAfterNext	KEYWORD2
+isTaskPaused	KEYWORD2
+getTaskFlags	KEYWORD2
+getPrev	KEYWORD2
+getNext	KEYWORD2
+isFirstRun	KEYWORD2
+isLastRun	KEYWORD2
+#######################################
+# Methods and Functions (KEYWORD3) Private
+#######################################
+taskBuilder	KEYWORD3
+#######################################
+# Constants (LITERAL1)
+#######################################
+_SimpleScheduler_Debug_	LITERAL1
+_m_taskRepeats	LITERAL1
+_m_taskPaused	LITERAL1
+_m_taskSendSelf	LITERAL1
+_m_taskLastRun	LITERAL1
+_m_taskFirstRun	LITERAL1
