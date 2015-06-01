@@ -112,21 +112,16 @@ SimpleTask SimpleScheduler.removeTaskAfterNext(SimpleTask theTask) ;
 ~~~
 Sets the task's `loopMax` to 1, the `loopCount` to 0, and unsets the `_m_taskRepeats` flag for the task so that it will be removed from the queue after it's next invocation.  Returns the task pointer.
 
+~~~cpp
+SimpleTask SimpleScheduler::getNextTask(SimpleTask currentTask) ;
+~~~
+Returns a pointer to the next task, or the head of the `taskList`, if `currentTask` is NULL.  Used to iterate through the task list for generating a task list, counting active versus paused tasks, etc.
+
 ###### SimpleTask
 ~~~cpp
 uint8_t SimpleTask->getTaskFlags() ;
 ~~~
 Returns the flags for the task as an 8-bit number.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler.
-
-~~~cpp
-SimpleTask SimpleTask->getPrev() ;
-~~~
-Returns the previous task in the task queue, or `NULL` if we are the first in the list.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler. Probably not much use except for a task list, and may go away if I can find a better way to generate a running task list.
-
-~~~cpp
-SimpleTask SimpleTask->getNext() ;
-~~~
-Returns the next task in the task queue, or `NULL` if we are the last in the list.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler. Probably not much use except for a task list, and may go away if I can find a better way to generate a running task list.
 
 ~~~cpp
 bool SimpleTask->isFirstRun() ;
@@ -147,8 +142,6 @@ typedef struct t_scheduledTask {
     uint16_t          loopMax ;
     uint16_t          loopCount ;
     uint8_t           getTaskFlags() const ;
-    t_scheduledTask  *getPrev()      const ;
-    t_scheduledTask  *getNext()      const ;
     bool              isFirstRun()   const ;
     bool              isLastRun()    const ;
 
@@ -167,8 +160,6 @@ typedef struct t_scheduledTask {
 * `loopMax` -- number of times to invoke task before autoremoval, or 0 if the task is to be run indefinately.
 * `loopCount` -- number of times a task with a non-zero loopMax has been invoked.
 * `getTaskFlags()` -- getter function so `taskFlags` can be read-only
-* `getPrev()` -- getter function so `prev` can be read-only
-* `getNext()` -- getter function so `next` can be read-only
 * `isFirstRun()` -- returns `true` if this is the first time the task has been called by `SimpleScheduler.checkQueue()`
 * `isLastRun()` -- returns `true` when the task is on its last run either because it was given a loop count or because `SimpleScheduler.removeTaskAfterNext(SimpleTask)` was called for the task.
 

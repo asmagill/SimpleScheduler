@@ -44,8 +44,6 @@ typedef struct t_scheduledTask {
     uint16_t          loopMax ;
     uint16_t          loopCount ;
     uint8_t           getTaskFlags() const ;
-    t_scheduledTask  *getPrev()      const ;
-    t_scheduledTask  *getNext()      const ;
     bool              isFirstRun()   const ;
     bool              isLastRun()    const ;
 
@@ -71,11 +69,12 @@ class SimpleScheduler {
 
     SimpleTask  pauseTask(SimpleTask theTask) ;
     SimpleTask  resumeTask(SimpleTask theTask, bool resetCycle = false) ;
+    bool        isTaskPaused(SimpleTask theTask) ;
 
     SimpleTask  removeTask(SimpleTask theTask) ;
     SimpleTask  removeTaskAfterNext(SimpleTask theTask) ;
 
-    bool        isTaskPaused(SimpleTask theTask) ;
+    SimpleTask  getNextTask(SimpleTask currentTask) ;
 
   private:
     SimpleTask  taskList ;

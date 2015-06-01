@@ -25,8 +25,6 @@
 
 // Getter functions for task attributes we don't want the user changing
 uint8_t    t_scheduledTask::getTaskFlags() const { return taskFlags ; }
-SimpleTask t_scheduledTask::getPrev()      const { return prev ; }
-SimpleTask t_scheduledTask::getNext()      const { return next ; }
 
 // Status functions for task
 bool t_scheduledTask::isFirstRun() const {
@@ -233,4 +231,10 @@ void SimpleScheduler::checkQueue() {
     }
     current = next ;
   }
+}
+
+// returns a pointer to the next task, or the taskList head, if currentTask is NULL
+// most useful for generating a task list or calculating the number of queued tasks
+SimpleTask SimpleScheduler::getNextTask(SimpleTask currentTask) {
+  return (currentTask) ? currentTask->next : taskList ;
 }

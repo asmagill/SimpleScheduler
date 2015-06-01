@@ -11,10 +11,9 @@
 //  doesn't matter what, as long as it's not "No line ending".
 
 //  Send 'B #' to blink LED 13 the number of times you specify.  While it is blinking,
-//  send 'T' and you'll see a list of between 3 and 4 tasks... 1 is from the task list
-//  generation code (see doParseSerial case 'T' below), 1 is for the pulsing heartbeat,
-//  1 is for the blinking task, and possibly you'll catch 1 for the task to turn off the
-//  blinking LED.
+//  send 'T' and you'll see a list of between 2 and 3 tasks... 1 for the pulsing
+//  heartbeat task, 1 for the blinking task, and possibly you'll catch 1 for the task
+//  to turn off the blinking LED.
 
 //  Send 'L #' to stop the pulsing LED and set it to a specific brightness.  Send 'L'
 //  by itself to restart the pulsing.
@@ -185,16 +184,7 @@ void doParseSerial() {
              << F(" Type '?' for help.") << endl ;
       break ;
     case 'T': {
-
-    // Here a task is created so we can get access to it's next/prev pointers.  It's a throw-away
-    // null function which will disappear as soon as checkQueue() is next called (in loop()) but
-    // allows us to check the state and number of tasks currently defined.
-
-      SimpleTask current = tasks.doTaskAfter([](){}, 1) ;
-
-      while (current->getPrev()) current = current->getPrev() ; // currently not necessary, since new tasks appear
-                                                                // at the top of the list, but if we change ordering,
-                                                                // or allow prioritization, it may become necessary.
+      SimpleTask current = tasks.getNextTask(NULL) ;
       uint8_t i = 0 ;
 
       while (current) {
@@ -204,9 +194,8 @@ void doParseSerial() {
                << F(" period: ") << _DEC(current->period)
                << F(" loopMax: ") << _DEC(current->loopMax)
                << F(" loopCount: ") << _DEC(current->loopCount)
-//               << F(" function: ") << _hexWord((size_t) current->theTask)
                << endl ;
-        current = current->getNext() ;
+        current = tasks.getNextTask(current) ;
         i++ ;
       }
       Serial << F(" Task Count: ") << _DEC(i) << F(" Time: ") << millis() << endl ;
