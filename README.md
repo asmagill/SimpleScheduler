@@ -3,24 +3,24 @@ SimpleScheduler for Arduino
 
 This is a very simple scheduler for tasks which are to be repeated every X ms or are to occur after X ms has passed.  There is no attempt at true "real time" -- the scheduler only promises that the task won't run *before* X ms have past.
 
-The goal of this library is to get rid of `delay(...)` statements in `loop()` and other functions in order to make all functions more responsive and simulate, as much as possible with a single threaded non-user-interupt driven controller, the appearance of simultaneous operations.
+The goal of this library is to get rid of `delay(...)` statements in `loop()` and other functions in order to make all functions more responsive and simulate, as much as possible with a single threaded controller running non-interupt driven code, the appearance of simultaneous operations.
 
 ### Environment
 This software has been tested on the Arduino UNO and the Arduino Leonardo.  Other than the example which displays memory addresses in the task list, there is no reason to expect that this code would not work on other Arduino platforms including those in which `size_t` is 32 rather than 16 bits -- *however it has not been tested in these environments.*
 
-This code does use `malloc` and `free` to dynamically create the data structures which contains task state information.  Some may have concerns with using dynamic memory in such a limited environment, but in my experience, this has not been a problem with this library and care is taken to make sure dynamic memory is freed as soon as it is no longer required. On systems with 16 bit addresses, each task only consumes 21 bytes of heap space.
+This code does use `malloc` and `free` to dynamically create the data structure which contains task state information.  Some may have concerns with using dynamic memory in such a limited environment, but in my experience, this has not been a problem with this library and care is taken to make sure dynamic memory is freed as soon as it is no longer required. On controllers with 16 bit addresses, each task consumes 21 bytes of heap space (this includes heap block-size overhead).
 
 ### How it Works
 
 This scheduler works by keeping a list of tasks (functions fitting the declaration of `void (*func)(void)` or `void (*func)(SimpleTask)`, which thankfully includes captureless lambdas: `[](){ whatever ; }` and `[](SimpleTask){ whatever ; }`
 
-Within this list, a task is designated as a repeater or as a single shot.  A repeater may have a `loopMax` set (how many times to run before removing itself from the task list) and a single shot is really only a task with a `loopMax` of 1.
+Within this list, a task is designated as a repeater or as a single shot.  A repeater may have a `loopMax` set (how many times to run before removing itself from the task list) and a single shot is really just a task with a `loopMax` of 1.
 
-You must invoke `SimpleScheduler::checkQueue()` from within `loop()`, ideally as often as possible to get the most accurate results... Note that this only checks tasks when `checkQueue()` is invoked, and then only runs tasks which were last run > period ms ago... each task that matches is run in the order of the `taskList` which is currently more like a stack then a queue (last in, first out); at present there is no checking for which task is "most behind", though this may change in the future.
+You must invoke `SimpleScheduler.checkQueue()` from within `loop()`, ideally as often as possible to get the most accurate results... Note that this only checks tasks when `checkQueue()` is invoked, and then only runs tasks which were last run > `period` ms ago... each task that matches is run in the order of the `taskList` which is currently more like a stack then a queue (last-in-first-out); at present there is no checking for which task is "most behind", though this may change in the future.
 
-The rationale for this last-in-first-out approach is the assumption that many of the tasks added outside of `setup()` will likely be short, one-shot, clean-up type tasks (e.g. detaching a servo after giving it enough time to complete its movement) and are likely a little more sensitive to delays or shorter lived than tasks created earlier or in `setup()`.
+The rationale for this last-in-first-out approach is the assumption that many of the tasks added outside of `setup()` will likely be short lived or one-shot, clean-up type tasks (e.g. detaching a servo after giving it enough time to complete its movement) and are likely a little more sensitive to delays or shorter lived than tasks created earlier or in `setup()`.
 
-Other functions which are invoked from within `loop()` or tasks which take a long time to run can throw off the timing of other tasks, as everything is still executed sequentially, so if you really need accurate real time timing, consider an interupt driven approach (beyond the scope of this library) or break up your tasks into smaller, shorter tasks so that other tasks have a chance to run.
+Other functions which are invoked from within `loop()` or tasks which take a long time to run can throw off the timing of other tasks, as everything is still executed sequentially, so if you really need accurate "real time" timing, consider an interupt driven approach (beyond the scope of this library and me, at present) or break up your tasks into smaller, shorter tasks so that other tasks have a chance to run.
 
 ### Usage
 
@@ -45,19 +45,23 @@ void loop() {
 ~~~cpp
 SimpleScheduler() ;
 ~~~
-Constructor for the SimpleScheduler class.  It is expected to be used as follows outside of `setup()` or `loop()` so that it is available to all functions within the sketch:
+Constructor for the SimpleScheduler class.
+
+It is expected to be used as follows outside of `setup()` or `loop()` so that it is available to all functions within the sketch:
 
 	SimpleScheduler tasks = SimpleScheduler() ;
 
 ~~~cpp
 ~SimpleScheduler() ;
 ~~~
-Destructor for the SimpleScheduler class.  I'm not actually certain if/when this might be called, as I haven't yet experimented with limiting the scope of `SimpleScheduler()` or coding for the Arduino platform outside of _ArduinoIDE_, but to make sure we "play nice with others" and release dynamically allocated memory if/when the class instance does go out of scope, this function visits each task defined in the task queue and calls `SimpleScheduler.removeTask(SimpleTask)` on it.
+Destructor for the SimpleScheduler class.
+
+I'm not actually certain if/when this might be called, as I haven't yet experimented with limiting the scope of `SimpleScheduler()` or coding for the Arduino platform outside of _ArduinoIDE_, but to make sure we "play nice with others" and release dynamically allocated memory if/when the class instance does go out of scope, this function visits each task defined in the task queue and calls `SimpleScheduler.removeTask(SimpleTask)` on it.
 
 ~~~cpp
 void SimpleScheduler.checkQueue() ;
 ~~~
-This function is expected to be invoked from within `loop()` and checks each defined task to determine if it is time to execute the task again.  Remember that this is the only place where tasks are actually given a chance to execute, so it should be called as often as possible... `loop()` with minimal to no unnecessary `delay()` invocations is ideal.
+This function is expected to be invoked from within `loop()` and checks each defined task to determine if it is time to execute the task again.  Remember that this is the only place where tasks are actually given a chance to execute, so it should be called as often as possible... `loop()` with minimal-to-no unnecessary `delay()` invocations is ideal.
 
 ~~~cpp
 SimpleTask SimpleScheduler.doTaskAfter(void (*theTask)(void), uint32_t timing) ;
@@ -66,6 +70,8 @@ SimpleTask SimpleScheduler.doTaskAfter(void (*theTask)(SimpleTask), uint32_t tim
 Schedule a task for a single execution in `timing` ms.  The task may be defined as a function which takes no parameters (see Heartbeat example), or as a function which takes a single parameter of the type `SimpleTask` (see Blink and InteractiveTest examples.)  When the task is completed, it will be automatically removed from the queue.
 
 Captureless lambda functions are also supported, as they reduce to one of the above functional casts (see Blink and InteractiveTest examples.)
+
+Returns a pointer to the new task.
 
 ~~~cpp
 SimpleTask SimpleScheduler.doTaskEvery(void (*theTask)(void), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
@@ -78,6 +84,8 @@ The task may be defined as a function which takes no parameters (see Heartbeat e
 Captureless lambda functions are also supported, as they reduce to one of the above functional casts (see Blink and InteractiveTest examples.)
 
 Note that if `count` is 0 or not supplied, then the task will run forever unless it is paused or removed (or the Arduino is powered off.)
+
+Returns a pointer to the new task.
 
 ~~~cpp
 SimpleTask SimpleScheduler.pauseTask(SimpleTask theTask) ;
@@ -92,7 +100,7 @@ Returns `true` if the task is currently paused, otherwise `false`.
 ~~~cpp
 SimpleTask SimpleScheduler.resumeTask(SimpleTask theTask, bool resetCycle = false) ;
 ~~~
-Resumes a paused task (or does nothing if it is not currently paused).  If `resetCycle` is passed in and is `true`, then the `SimpleTask->lastRun` field is set to the current value of `millis()` so that the next run will occur after `SimpleTask->period` ms have occured. If is `false` or not specified, then `SimpleTask->lastRun` is untouched, and it is likely that the task will trigger immediately (during the next `SimpleScheduler.checkQueue()` call), depnding upon how much time has passed. Returns the task pointer.
+Resumes a paused task (or does nothing if it is not currently paused).  If `resetCycle` is passed in and is `true`, then the `SimpleTask->lastRun` field is set to the current value of `millis()` so that the next run will occur after `SimpleTask->period` ms have occured. If is `false` or not specified, then `SimpleTask->lastRun` is untouched, and it is likely that the task will trigger immediately (during the next `SimpleScheduler.checkQueue()` call), depending upon how much time has passed. Returns the task pointer.
 
 ~~~cpp
 SimpleTask SimpleScheduler.removeTask(SimpleTask theTask) ;
@@ -113,12 +121,12 @@ Returns the flags for the task as an 8-bit number.  A getter is used for this fi
 ~~~cpp
 SimpleTask SimpleTask->getPrev() ;
 ~~~
-Returns the previous task in the task queue, or `NULL` if we are the first in the list.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler.
+Returns the previous task in the task queue, or `NULL` if we are the first in the list.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler. Probably not much use except for a task list, and may go away if I can find a better way to generate a running task list.
 
 ~~~cpp
 SimpleTask SimpleTask->getNext() ;
 ~~~
-Returns the next task in the task queue, or `NULL` if we are the last in the list.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler.
+Returns the next task in the task queue, or `NULL` if we are the last in the list.  A getter is used for this field so that it is read-only and cannot be changed from outside of the scheduler. Probably not much use except for a task list, and may go away if I can find a better way to generate a running task list.
 
 ~~~cpp
 bool SimpleTask->isFirstRun() ;
@@ -158,7 +166,7 @@ typedef struct t_scheduledTask {
 * `period` -- time in millis between invocations of the task.
 * `loopMax` -- number of times to invoke task before autoremoval, or 0 if the task is to be run indefinately.
 * `loopCount` -- number of times a task with a non-zero loopMax has been invoked.
-* `getTaskFlags()` -- getter function so taskFlags can be read-only
+* `getTaskFlags()` -- getter function so `taskFlags` can be read-only
 * `getPrev()` -- getter function so `prev` can be read-only
 * `getNext()` -- getter function so `next` can be read-only
 * `isFirstRun()` -- returns `true` if this is the first time the task has been called by `SimpleScheduler.checkQueue()`
@@ -174,7 +182,7 @@ typedef struct t_scheduledTask {
 ~~~cpp
 #define _SimpleScheduler_Debug_
 ~~~
-If this macro is set in `SimpleScheduler.h`, then the SimpleScheduler methods will print an error message via the serial port whenever the SimpleTask pointer passed into them is NULL.  Hopefully this never happens!  Comment out this macro if you're not using the serial port or you're expecting specific output via the serial port and this extraneous output might break the receiving parser.
+If this macro is set in `SimpleScheduler.h`, then the SimpleScheduler methods will print an error message via the serial port whenever the SimpleTask pointer passed into them is NULL.  Hopefully this never happens!  Comment out this macro if you're not using the serial port or if you're expecting specific output via the serial port and this extraneous output might break or confuse the receiver.
 
 ###### Task Flags `SimpleTask->taskFlags`
 ~~~cpp
@@ -210,7 +218,7 @@ Set when the task is called for the very first time from `SimpleScheduler.checkQ
 ### Known Caveats, Questions, or Issues
 * I am not sure how this library will handle the approximate 45 day wraparound of millis()... hopefully well, but this hasn't been tested yet.
 * Lambda functions with captures are not supported, which means tasks have to keep their own state information and other variances within static variables or utilize Global variables.  Initial investigation into supporting lambdas with variable capture is not promising and looks like it may significantly affect the memory footprint, but if anyone has any ideas, I am all ears!
-* Should a task be able to modify its function Similar to the [Arduino Playground's TaskScheduler](http://playground.arduino.cc/Code/TaskScheduler)?  I started this before finding the above code, and while I think my code is maybe simpler to use (at least for the way I think and plan things!), this is one feature I didn't include and I can't decide if changing to support this is a feature or a risk.
+* Should a task be able to modify its function Similar to the [Arduino Playground's TaskScheduler](http://playground.arduino.cc/Code/TaskScheduler)?  I started this before finding the above code, and while I think my code is maybe simpler to use (at least for the way I think and organize things!), this is one feature I didn't include and I can't decide if changing to support this is a feature or a risk.
 
 ### License
 
