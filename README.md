@@ -20,7 +20,7 @@ You must invoke `SimpleScheduler.checkQueue()` from within `loop()`, ideally as 
 
 The rationale for this last-in-first-out approach is the assumption that many of the tasks added outside of `setup()` will likely be short lived or one-shot, clean-up type tasks (e.g. detaching a servo after giving it enough time to complete its movement) and are likely a little more sensitive to delays or shorter lived than tasks created earlier or in `setup()`.
 
-Other functions which are invoked from within `loop()` or tasks which take a long time to run can throw off the timing of other tasks, as everything is still executed sequentially, so if you really need accurate "real time" timing, consider an interupt driven approach (beyond the scope of this library and me, at present) or break up your tasks into smaller, shorter tasks so that other tasks have a chance to run.
+Other functions which are invoked from within `loop()` or tasks which take a long time to run can throw off the timing of other tasks, as everything is still executed sequentially, so if you really need accurate "real time" timing, consider an interupt driven approach (beyond the scope of this library and me, at present) or break up your tasks into smaller, shorter tasks using task chaining (i.e. create sub tasks from within a task) so that other tasks have a chance to run.
 
 ### Usage
 
@@ -211,7 +211,7 @@ Set when the task is on its last run either because it was given a loop count or
 Set when the task is called for the very first time from `SimpleScheduler.checkQueue()`.
 
 ### Examples
-* _Blink_ -- This example recreates the standard Blink example using tasks.  It shows a lambda function based task which takes the `SimpleTask` parameter and triggers another task each time it is invoked.
+* _Blink_ -- This example recreates the standard Blink example using tasks.  It shows a lambda function based task which takes the `SimpleTask` parameter and triggers another task each time it is invoked as a simple example of task chaining.
 * _Heartbeat_ -- This example recreates the Heartbeat pulse found in _ArduinoISP_ as a task.
 * _InteractiveTest_ -- This example is more complex which starts with the Heartbeat task but allows you to trigger the Blink task with a count limit, pause and resume the Heartbeat task, and list the currently running tasks.  The output of running tasks currently requires [Streaming.h](http://arduiniana.org/libraries/streaming/) to simplify the format of the output.
 
