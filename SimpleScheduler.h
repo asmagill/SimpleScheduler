@@ -25,17 +25,21 @@
 #ifndef _SIMPLESCHEDULER_H
 #define _SIMPLESCHEDULER_H
 
+// sample size to max out at for loop granularity average
+#define AVG_SAMPLE_SIZE 100000
+
 #include <Arduino.h>
 
 // Outputs error messages if task methods are called to act on a NULL task...
 // shouldn't happen, but a nice check if it won't screw up other use of Serial output.
 #define _SimpleScheduler_Debug_
 
-#define _m_taskRepeats  B00000001 // don't really use this... do we need it?
-#define _m_taskPaused   B00000010 // is task paused?
-#define _m_taskSendSelf B00000100 // whether task is invoked as 0 - task(void) or 1 - task(SimpleTask)
-#define _m_taskLastRun  B01000000 // is this our last run?
-#define _m_taskFirstRun B10000000 // is this our first run?
+#define _m_taskRepeats   B00000001 // don't really use this... do we need it?
+#define _m_taskPaused    B00000010 // is task paused?
+#define _m_taskSendSelf  B00000100 // whether task is invoked as 0 - task(void) or 1 - task(SimpleTask)
+#define _m_taskUseMicros B00001000
+#define _m_taskLastRun   B01000000 // is this our last run?
+#define _m_taskFirstRun  B10000000 // is this our first run?
 
 typedef struct t_scheduledTask {
   public:
@@ -66,6 +70,10 @@ class SimpleScheduler {
     SimpleTask  doTaskEvery(void (*theTask)(void), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
     SimpleTask  doTaskAfter(void (*theTask)(SimpleTask), uint32_t timing) ;
     SimpleTask  doTaskEvery(void (*theTask)(SimpleTask), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
+    SimpleTask  doTaskAfterMicros(void (*theTask)(void), uint32_t timing) ;
+    SimpleTask  doTaskEveryMicros(void (*theTask)(void), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
+    SimpleTask  doTaskAfterMicros(void (*theTask)(SimpleTask), uint32_t timing) ;
+    SimpleTask  doTaskEveryMicros(void (*theTask)(SimpleTask), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
 
     SimpleTask  pauseTask(SimpleTask theTask) ;
     SimpleTask  resumeTask(SimpleTask theTask, bool resetCycle = false) ;
@@ -75,10 +83,12 @@ class SimpleScheduler {
     SimpleTask  removeTaskAfterNext(SimpleTask theTask) ;
 
     SimpleTask  getNextTask(SimpleTask currentTask) ;
+    uint32_t    currentGranularity, averageGranularity ;
 
   private:
     SimpleTask  taskList ;
-    SimpleTask  taskBuilder(void (*theTask)(void), uint32_t timing, uint16_t count, bool immediateRun, bool sendSelf) ;
+    SimpleTask  taskBuilder(void (*theTask)(void), uint32_t timing, uint16_t count, bool immediateRun, bool sendSelf, bool inMicros) ;
+    uint32_t    microsOfLastCheck, sampleSize ;
 };
 
 #endif // _SIMPLESCHEDULER_H

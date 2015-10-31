@@ -37,7 +37,10 @@ bool t_scheduledTask::isLastRun() const {
 // Constructor -- simply initialize tasklist as empty.
 
 SimpleScheduler::SimpleScheduler(void) {
-  taskList = NULL ;
+  taskList           = NULL ;
+  microsOfLastCheck  = 0 ;
+  averageGranularity = 0 ;
+  sampleSize         = 0 ;
 }
 
 // Destructor -- remove all tasks to free up heap space.
@@ -62,38 +65,53 @@ SimpleScheduler::~SimpleScheduler(void) {
 // set up a repeating task -- this is the public task constructor for tasks which do not receive their task ptr as an argument.
 
 SimpleTask SimpleScheduler::doTaskEvery(void (*theTask)(void), uint32_t timing, uint16_t count /* = 0 */, bool immediateRun /* = true */) {
-  return taskBuilder(theTask, timing, count, immediateRun, false) ;
+  return taskBuilder(theTask, timing, count, immediateRun, false, false) ;
 }
 
 // set up a single shot task (which does not receive it's pointer) that will occur after the specified number of millis
 
 SimpleTask SimpleScheduler::doTaskAfter(void (*theTask)(void), uint32_t timing) {
-  return taskBuilder(theTask, timing, 1, false, false) ;
+  return taskBuilder(theTask, timing, 1, false, false, false) ;
 }
 
 // set up a repeating task -- this is the public task constructor for tasks which do receive their task ptr as an argument.
 
 SimpleTask SimpleScheduler::doTaskEvery(void (*theTask)(SimpleTask), uint32_t timing, uint16_t count /* = 0 */, bool immediateRun /* = true */) {
-  return taskBuilder((void (*)()) theTask, timing, count, immediateRun, true) ;
+  return taskBuilder((void (*)()) theTask, timing, count, immediateRun, true, false) ;
 }
 
 // set up a single shot task (which does receive it's pointer) that will occur after the specified number of millis
 
 SimpleTask SimpleScheduler::doTaskAfter(void (*theTask)(SimpleTask), uint32_t timing) {
-  return taskBuilder((void (*)()) theTask, timing, 1, false, true) ;
+  return taskBuilder((void (*)()) theTask, timing, 1, false, true, false) ;
+}
+
+// sames as above, but use microsecond instead of millisecond loops
+SimpleTask SimpleScheduler::doTaskEveryMicros(void (*theTask)(void), uint32_t timing, uint16_t count /* = 0 */, bool immediateRun /* = true */) {
+  return taskBuilder(theTask, timing, count, immediateRun, false, true) ;
+}
+SimpleTask SimpleScheduler::doTaskAfterMicros(void (*theTask)(void), uint32_t timing) {
+  return taskBuilder(theTask, timing, 1, false, false, true) ;
+}
+SimpleTask SimpleScheduler::doTaskEveryMicros(void (*theTask)(SimpleTask), uint32_t timing, uint16_t count /* = 0 */, bool immediateRun /* = true */) {
+  return taskBuilder((void (*)()) theTask, timing, count, immediateRun, true, true) ;
+}
+SimpleTask SimpleScheduler::doTaskAfterMicros(void (*theTask)(SimpleTask), uint32_t timing) {
+  return taskBuilder((void (*)()) theTask, timing, 1, false, true, true) ;
 }
 
 // private function which does the heavy lifting for the public task creation functions above
 
-SimpleTask SimpleScheduler::taskBuilder(void (*theTask)(void), uint32_t timing, uint16_t count, bool immediateRun, bool sendSelf) {
+SimpleTask SimpleScheduler::taskBuilder(void (*theTask)(void), uint32_t timing, uint16_t count, bool immediateRun, bool sendSelf, bool inMicros) {
 
   SimpleTask newTask = (SimpleTask) malloc(sizeof(t_scheduledTask)) ;
   newTask->taskFlags = _m_taskFirstRun ;
   if (count != 1) newTask->taskFlags |= _m_taskRepeats ;
   if (sendSelf)   newTask->taskFlags |= _m_taskSendSelf ;
+  if (inMicros)   newTask->taskFlags |= _m_taskUseMicros ;
 
   newTask->theTask = theTask ;
-  newTask->lastRun = immediateRun ? 0 : millis() ;
+  newTask->lastRun = immediateRun ? 0 : (inMicros ? micros() : millis()) ;
   newTask->period = timing ;
   newTask->loopMax = count ;
   newTask->loopCount = 0 ;
@@ -141,7 +159,7 @@ SimpleTask SimpleScheduler::pauseTask(SimpleTask theTask) {
 SimpleTask SimpleScheduler::resumeTask(SimpleTask theTask, bool resetCount /* = false */) {
   if (theTask) {
     theTask->taskFlags &= ~_m_taskPaused ;
-    if (resetCount) theTask->lastRun = millis() ;
+    if (resetCount) theTask->lastRun = (theTask->taskFlags | _m_taskUseMicros) ? micros() : millis() ;
   }
 #ifdef _SimpleScheduler_Debug_
     else
@@ -205,16 +223,47 @@ SimpleTask SimpleScheduler::removeTask(SimpleTask theTask) {
   return theTask ;
 }
 
+// uint32_t SimpleScheduler::queueCheckCount() {
+//     return visitsCounter ;
+// }
+
 // this is the function called in loop() which actually runs through the tasks and
 // determines if it is time to run them again.
 
 void SimpleScheduler::checkQueue() {
   SimpleTask current = taskList, next = NULL ;
 
+  if (micros() > microsOfLastCheck) {
+      currentGranularity = micros() - microsOfLastCheck ;
+  } else {
+      currentGranularity = ((uint32_t)(-1l) - microsOfLastCheck) + micros() ;
+  }
+
+// average will be biased a bit at the wrap-around point, but it should be close enough for all but the
+// most picky... in which case, you're probably doing your own thing because you need more precision
+// than this is capable of.
+
+  if (sampleSize == 0) {
+      averageGranularity = currentGranularity ;
+  } else {
+      averageGranularity = (averageGranularity * (sampleSize - 1) + currentGranularity) / sampleSize ;
+  }
+  if (sampleSize != AVG_SAMPLE_SIZE) sampleSize++ ;
+
   while(current) {
     next = current->next ;
     if (!(current->taskFlags & _m_taskPaused)) {
-      if ((millis() - current->lastRun) > current->period) {
+      uint32_t delta ;
+
+      if (current->taskFlags & _m_taskUseMicros)
+          delta = (micros() < current->lastRun) ?
+              ((micros() + current->period) - (current->lastRun + current->period)) :
+              (micros() - current->lastRun) ;
+      else
+          delta = (millis() < current->lastRun) ?
+              ((millis() + current->period) - (current->lastRun + current->period)) :
+              (millis() - current->lastRun) ;
+      if (delta > current->period) {
         if (current->loopMax != 0) {
           current->loopCount++ ;
           if (current->loopCount == current->loopMax) current->taskFlags |= _m_taskLastRun ;
@@ -225,12 +274,14 @@ void SimpleScheduler::checkQueue() {
           (current->theTask)() ;
         }
         current->taskFlags &= ~_m_taskFirstRun ;
-        current->lastRun = millis() ;
+        current->lastRun = (current->taskFlags | _m_taskUseMicros) ? micros() : millis() ;
         if(current->taskFlags & _m_taskLastRun) removeTask(current) ;
       }
     }
     current = next ;
   }
+
+  microsOfLastCheck = micros() ;
 }
 
 // returns a pointer to the next task, or the taskList head, if currentTask is NULL

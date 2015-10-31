@@ -88,6 +88,16 @@ Note that if `count` is 0 or not supplied, then the task will run forever unless
 Returns a pointer to the new task.
 
 ~~~cpp
+SimpleTask SimpleScheduler.doTaskAfterMicros(void (*theTask)(void), uint32_t timing) ;
+SimpleTask SimpleScheduler.doTaskAfterMicros(void (*theTask)(SimpleTask), uint32_t timing) ;
+SimpleTask SimpleScheduler.doTaskEveryMicros(void (*theTask)(void), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
+SimpleTask SimpleScheduler.doTaskEveryMicros(void (*theTask)(SimpleTask), uint32_t timing, uint16_t count = 0, bool immediateRun = true) ;
+~~~
+Similar to the above, but timing is based upon microseconds rather than milliseconds.
+
+The fastest time I was able to achieve with a stripped down task list and nothing other than `tasks.checkQueue()` in the loop portion of a project hovered around 15 microseconds... If you need a precise time interval, it is probably better to go ahead and use `delayMicroseconds()` in your code.  These functions are primarly for tasks which *should* happen more often than 1000 times a second, but aren't critical if some are a little late.
+
+~~~cpp
 SimpleTask SimpleScheduler.pauseTask(SimpleTask theTask) ;
 ~~~
 Pauses a queued task (or does nothing if it is currently paused).  Returns the task pointer.
@@ -132,6 +142,18 @@ Returns `true` if the task is running for the first time since it was created.
 bool SimpleTask->isLastRun() ;
 ~~~
 Returns `true` if the task is running for the last time either because it was given a loop count or because `SimpleScheduler.removeTaskAfterNext(SimpleTask)` was called for the task.
+
+### Variables
+
+~~~cpp
+uint32_t SimpleScheduler.averageGranularity
+~~~
+The average time difference in microseconds between queue checks for waiting tasks.  Stored as a 32-bit unsigned integer.  The average is calculated by maintining a rolling average which weights the previous average by the number of times the loop check function has been called or 100000, whichever is smaller. when adding the `currentGranularity` and updating the average.  Change the sample size by adjusting `AVG_SAMPLE_SIZE` in `SimpleScheduler.h`
+
+~~~cpp
+uint32_t SimpleScheduler.currentGranularity
+~~~
+The time difference in microseconds between the last two checks of the queue.  Stored as a 32-bit unsigned integer.  Depending upon which tasks were actually invoked during the last queue check, this number will likely fluctuate.
 
 ### `SimpleTask` definition:
 ~~~cpp
@@ -190,6 +212,11 @@ Set whenever a task is paused via `SimpleScheduler.pauseTask(SimpleTask)`. Unset
 #define _m_taskSendSelf B00000100
 ~~~
 Set when the callback function for the task uses the `void (*func)(SimpleTask)` cast.  Unset when the callback function uses the `void (*func)(void)` cast.
+
+~~~cpp
+#define _m_taskUseMicros B00001000
+~~~
+Set when the loop should check to see if the specified number of microseconds have passed, rather than the number of milliseconds.
 
 ~~~cpp
 #define _m_taskLastRun  B01000000
