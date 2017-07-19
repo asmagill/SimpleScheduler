@@ -159,7 +159,7 @@ SimpleTask SimpleScheduler::pauseTask(SimpleTask theTask) {
 SimpleTask SimpleScheduler::resumeTask(SimpleTask theTask, bool resetCount /* = false */) {
   if (theTask) {
     theTask->taskFlags &= ~_m_taskPaused ;
-    if (resetCount) theTask->lastRun = (theTask->taskFlags | _m_taskUseMicros) ? micros() : millis() ;
+    if (resetCount) theTask->lastRun = (theTask->taskFlags & _m_taskUseMicros) ? micros() : millis() ;
   }
 #ifdef _SimpleScheduler_Debug_
     else
@@ -233,10 +233,13 @@ SimpleTask SimpleScheduler::removeTask(SimpleTask theTask) {
 void SimpleScheduler::checkQueue() {
   SimpleTask current = taskList, next = NULL ;
 
-  if (micros() > microsOfLastCheck) {
-      currentGranularity = micros() - microsOfLastCheck ;
+  unsigned long cMicros = micros() ;
+  unsigned long cMillis = millis() ;
+
+  if (cMicros > microsOfLastCheck) {
+      currentGranularity = cMicros - microsOfLastCheck ;
   } else {
-      currentGranularity = ((uint32_t)(-1l) - microsOfLastCheck) + micros() ;
+      currentGranularity = ((uint32_t)(-1l) - microsOfLastCheck) + cMicros ;
   }
 
 // average will be biased a bit at the wrap-around point, but it should be close enough for all but the
@@ -256,13 +259,13 @@ void SimpleScheduler::checkQueue() {
       uint32_t delta ;
 
       if (current->taskFlags & _m_taskUseMicros)
-          delta = (micros() < current->lastRun) ?
-              ((micros() + current->period) - (current->lastRun + current->period)) :
-              (micros() - current->lastRun) ;
+          delta = (cMicros < current->lastRun) ?
+              ((cMicros + current->period) - (current->lastRun + current->period)) :
+              (cMicros - current->lastRun) ;
       else
-          delta = (millis() < current->lastRun) ?
-              ((millis() + current->period) - (current->lastRun + current->period)) :
-              (millis() - current->lastRun) ;
+          delta = (cMillis < current->lastRun) ?
+              ((cMillis + current->period) - (current->lastRun + current->period)) :
+              (cMillis - current->lastRun) ;
       if (delta > current->period) {
         if (current->loopMax != 0) {
           current->loopCount++ ;
@@ -274,14 +277,14 @@ void SimpleScheduler::checkQueue() {
           (current->theTask)() ;
         }
         current->taskFlags &= ~_m_taskFirstRun ;
-        current->lastRun = (current->taskFlags | _m_taskUseMicros) ? micros() : millis() ;
+        current->lastRun = (current->taskFlags & _m_taskUseMicros) ? cMicros : cMillis ;
         if(current->taskFlags & _m_taskLastRun) removeTask(current) ;
       }
     }
     current = next ;
   }
 
-  microsOfLastCheck = micros() ;
+  microsOfLastCheck = cMicros ;
 }
 
 // returns a pointer to the next task, or the taskList head, if currentTask is NULL
